@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"image"
 	"image/color"
 	_ "image/png"
 	"log"
@@ -11,10 +13,19 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
+
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/math/fixed"
 )
 
 const sampleRate = 44100
+
+type Settings struct {
+	Username   string         `json:"username"`
+	Fullscreen bool           `json:"fullscreen"`
+	UserStats  map[string]int `json:"user_stats"`
+}
 
 var (
 	screenWidth    = 640
@@ -34,6 +45,9 @@ var (
 	goBackX        = 0.0
 	goBackY        = 0.0
 	goBackScale    = 0.3
+	fscreenX       = 240.0
+	fscreenY       = 165.0
+	fscreenScale   = 0.26
 	inputRunes     []rune
 	currentScene   = "Menu"
 	userName       string
@@ -43,12 +57,89 @@ var (
 	archerButton   *ebiten.Image
 	settingsButton *ebiten.Image
 	goBack         *ebiten.Image
+	fscreen        *ebiten.Image
 	audioCtx       *audio.Context
 	player         *audio.Player
+	fontFace       font.Face
+	settings       Settings
 )
 
+func loadFont() font.Face {
+	ttfBytes, err := os.ReadFile("./src/fonts/Queensides-3z7Ey.ttf")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ttfFont, err := opentype.Parse(ttfBytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	const dpi = 72
+	const fontSize = 24
+
+	fontFace, err := opentype.NewFace(ttfFont, &opentype.FaceOptions{
+		Size:    fontSize,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return fontFace
+}
+
+func LoadSettings(filename string) Settings {
+	var settings Settings
+
+	file, err := os.Open(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// File doesn't exist, return default settings
+			return Settings{
+				Username:   "",
+				Fullscreen: true,
+				UserStats:  make(map[string]int),
+			}
+		} else {
+			log.Fatal(err)
+		}
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&settings)
+	if err != nil {
+		log.Fatal("Failed to decode settings:", err)
+	}
+
+	return settings
+}
+func SaveSettings(filename string, settings Settings) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ") // Pretty print JSON
+	return encoder.Encode(settings)
+}
+
 func init() {
+
 	var err error
+	settings = LoadSettings("settings.json")
+
+	userName = settings.Username
+
+	if settings.Fullscreen {
+		ebiten.SetFullscreen(true)
+	} else {
+		ebiten.SetFullscreen(false)
+	}
+	fontFace = loadFont()
 	audioCtx = audio.NewContext(sampleRate)
 	crosshair, _, err = ebitenutil.NewImageFromFile("./src/gui/crosshair.png")
 	if err != nil {
@@ -66,7 +157,12 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	goBack, _, err = ebitenutil.NewImageFromFile("./src/gui/goBack.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fscreen, _, err = ebitenutil.NewImageFromFile("./src/gui/fscreen.png")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -90,11 +186,11 @@ type Game struct{}
 
 func (g *Game) Update() error {
 	cursorX, cursorY = ebiten.CursorPosition()
-	inputRunes = inputRunes[:0]
+	inputRunes = inputRunes[:0] // ctrl chars
 	inputRunes = ebiten.AppendInputChars(inputRunes)
 
 	for _, r := range inputRunes {
-		if r >= 0x20 && r != 0x7F { // ignore control characters
+		if r >= 0x20 && r != 0x7F {
 			userInput += string(r)
 		}
 	}
@@ -132,20 +228,34 @@ func (g *Game) Update() error {
 			}
 		}
 		if currentScene == "Settings" {
-			width := float64(goBack.Bounds().Dx()) * goBackScale
-			height := float64(goBack.Bounds().Dy()) * goBackScale
+			widthG := float64(goBack.Bounds().Dx()) * goBackScale
+			heightG := float64(goBack.Bounds().Dy()) * goBackScale
+			widthF := float64(goBack.Bounds().Dx()) * goBackScale
+			heightF := float64(goBack.Bounds().Dy()) * goBackScale
 
-			if float64(cursorX) >= goBackX && float64(cursorX) <= goBackX+width &&
-				float64(cursorY) >= goBackY && float64(cursorY) <= goBackY+height {
+			if float64(cursorX) >= goBackX && float64(cursorX) <= goBackX+widthG &&
+				float64(cursorY) >= goBackY && float64(cursorY) <= goBackY+heightG {
 				player.Rewind()
 				player.Play()
 				currentScene = "Menu"
+			}
+			if float64(cursorX) >= fscreenX && float64(cursorX) <= fscreenX+widthF &&
+				float64(cursorY) >= fscreenY && float64(cursorY) <= fscreenY+heightF {
+				player.Rewind()
+				player.Play()
+				settings.Fullscreen = !settings.Fullscreen
+				ebiten.SetFullscreen(settings.Fullscreen)
 			}
 		}
 
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+		err := SaveSettings("settings.json", settings)
+		if err != nil {
+			log.Println("Settings failure:", err)
+
+		}
 		log.Fatal("Game closed by user")
 	}
 
@@ -177,11 +287,68 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		goBackOp := &ebiten.DrawImageOptions{}
 		goBackOp.GeoM.Scale(goBackScale, goBackScale)
 		goBackOp.GeoM.Translate(goBackX, goBackY)
+		fScreenOp := &ebiten.DrawImageOptions{}
+		fScreenOp.GeoM.Scale(fscreenScale, fscreenScale)
+		fScreenOp.GeoM.Translate(fscreenX, fscreenY)
+		fScreenOp.ColorScale.Reset()
+		if settings.Fullscreen {
+
+			fScreenOp.ColorScale.Scale(0, 1, 0, 1)
+		} else {
+
+			fScreenOp.ColorScale.Scale(1, 0, 0, 1)
+		}
+
 		screen.DrawImage(goBack, goBackOp)
-		text.Draw(screen, userInput)
+		screen.DrawImage(fscreen, fScreenOp)
+		//user input
+		dUI := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(80, 80),
+		}
+		//"Input username" text
+		dIUN := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(80, 60),
+		}
+		//"Current username" text
+		dUN := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(80, 130),
+		}
+		// username
+		dUNV := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(80, 150),
+		}
+		//fullscreen
+		dFS := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(80, 180),
+		}
+		dUI.DrawString(userInput)
+		dIUN.DrawString("Input username:")
+		dUN.DrawString("Current username:")
+		dUNV.DrawString(userName)
+		dFS.DrawString("Fullscreen:")
 		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 			userName = userInput
+			settings.Username = userInput
 			userInput = ""
+			err := SaveSettings("settings.json", settings)
+			if err != nil {
+				log.Println("Settings failure:", err)
+			}
 		}
 
 	}
@@ -202,8 +369,6 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func main() {
 	ebiten.SetCursorMode(ebiten.CursorModeHidden)
-
-	ebiten.SetFullscreen(true)
 	ebiten.SetWindowTitle("Crudefense")
 	if err := ebiten.RunGame(&Game{}); err != nil {
 		log.Fatal(err)
