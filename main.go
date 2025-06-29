@@ -27,6 +27,7 @@ type Settings struct {
 	UserStats  map[string]int `json:"user_stats"`
 }
 
+var gameplay *Gameplay
 var (
 	screenWidth    = 640
 	screenHeight   = 480
@@ -48,6 +49,9 @@ var (
 	fscreenX       = 240.0
 	fscreenY       = 165.0
 	fscreenScale   = 0.26
+	playerX        = 150.0
+	playerY        = 150.0
+	playerScale    = 0.4
 	inputRunes     []rune
 	currentScene   = "Menu"
 	userName       string
@@ -58,6 +62,7 @@ var (
 	settingsButton *ebiten.Image
 	goBack         *ebiten.Image
 	fscreen        *ebiten.Image
+	mainChar       *ebiten.Image
 	audioCtx       *audio.Context
 	player         *audio.Player
 	fontFace       font.Face
@@ -166,6 +171,10 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	mainChar, _, err = ebitenutil.NewImageFromFile("./src/entities/mainChar.png")
+	if err != nil {
+		log.Fatal(err)
+	}
 	f, err := os.Open("./src/audio/clickSound.wav")
 	if err != nil {
 		log.Fatal(err)
@@ -180,6 +189,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	gameplay = NewGameplay()
 }
 
 type Game struct{}
@@ -257,6 +267,9 @@ func (g *Game) Update() error {
 
 		}
 		log.Fatal("Game closed by user")
+	}
+	if currentScene == "Game" {
+		gameplay.Update()
 	}
 
 	return nil
@@ -352,6 +365,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 
 	}
+	if currentScene == "Game" {
+		gameplay.Draw(screen)
+	}
 	crossOp := &ebiten.DrawImageOptions{}
 
 	crossW := crosshair.Bounds().Dx()
@@ -361,6 +377,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	crossOp.GeoM.Scale(0.03, 0.03)
 	crossOp.GeoM.Translate(float64(cursorX), float64(cursorY))
 	screen.DrawImage(crosshair, crossOp)
+
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
