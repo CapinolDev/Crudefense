@@ -29,44 +29,48 @@ type Settings struct {
 
 var gameplay *Gameplay
 var (
-	screenWidth    = 640
-	screenHeight   = 480
-	cursorX        = 0
-	cursorY        = 0
-	playBtnX       = 50.0
-	playBtnY       = 50.0
-	playBtnScale   = 0.7
-	archBtnX       = 0.0
-	archBtnY       = 0.0
-	archBtnScaleX  = 0.6
-	archBtnScaleY  = 0.8
-	settingsX      = 10.0
-	settingsY      = 420.0
-	settingsScale  = 0.1
-	goBackX        = 0.0
-	goBackY        = 0.0
-	goBackScale    = 0.3
-	fscreenX       = 240.0
-	fscreenY       = 165.0
-	fscreenScale   = 0.26
-	playerX        = 150.0
-	playerY        = 150.0
-	playerScale    = 0.4
-	inputRunes     []rune
-	currentScene   = "Menu"
-	userName       string
-	userInput      string
-	crosshair      *ebiten.Image
-	playButton     *ebiten.Image
-	archerButton   *ebiten.Image
-	settingsButton *ebiten.Image
-	goBack         *ebiten.Image
-	fscreen        *ebiten.Image
-	mainChar       *ebiten.Image
-	audioCtx       *audio.Context
-	player         *audio.Player
-	fontFace       font.Face
-	settings       Settings
+	screenWidth     = 640
+	screenHeight    = 480
+	cursorX         = 0
+	cursorY         = 0
+	playBtnX        = 50.0
+	playBtnY        = 50.0
+	playBtnScale    = 0.7
+	archBtnX        = 0.0
+	archBtnY        = 0.0
+	archBtnScaleX   = 0.6
+	archBtnScaleY   = 0.8
+	settingsX       = 10.0
+	settingsY       = 420.0
+	settingsScale   = 0.1
+	goBackX         = 0.0
+	goBackY         = 0.0
+	goBackScale     = 0.3
+	fscreenX        = 240.0
+	fscreenY        = 165.0
+	fscreenScale    = 0.26
+	playerX         = 150.0
+	playerY         = 150.0
+	playerScale     = 0.4
+	menuButtonX     = 220.0
+	menuButtonY     = 180.0
+	menuButtonScale = 0.5
+	inputRunes      []rune
+	currentScene    = "Menu"
+	userName        string
+	userInput       string
+	crosshair       *ebiten.Image
+	playButton      *ebiten.Image
+	archerButton    *ebiten.Image
+	settingsButton  *ebiten.Image
+	goBack          *ebiten.Image
+	fscreen         *ebiten.Image
+	mainChar        *ebiten.Image
+	menuButton      *ebiten.Image
+	audioCtx        *audio.Context
+	player          *audio.Player
+	fontFace        font.Face
+	settings        Settings
 )
 
 func loadFont() font.Face {
@@ -175,6 +179,10 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	menuButton, _, err = ebitenutil.NewImageFromFile("./src/gui/menuButton.png")
+	if err != nil {
+		log.Fatal(err)
+	}
 	f, err := os.Open("./src/audio/clickSound.wav")
 	if err != nil {
 		log.Fatal(err)
@@ -255,6 +263,17 @@ func (g *Game) Update() error {
 				player.Play()
 				settings.Fullscreen = !settings.Fullscreen
 				ebiten.SetFullscreen(settings.Fullscreen)
+			}
+		}
+		if currentScene == "GameOver" {
+			widthM := float64(menuButton.Bounds().Dx()) * menuButtonScale
+			heightM := float64(menuButton.Bounds().Dy()) * menuButtonScale
+
+			if float64(cursorX) >= menuButtonX && float64(cursorX) <= menuButtonX+widthM &&
+				float64(cursorY) >= menuButtonY && float64(cursorY) <= menuButtonY+heightM {
+				player.Rewind()
+				player.Play()
+				currentScene = "Menu"
 			}
 		}
 
@@ -366,7 +385,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	}
 	if currentScene == "Game" {
+
 		gameplay.Draw(screen)
+	}
+	if currentScene == "GameOver" {
+		resetValues()
+		screen.Fill(color.RGBA{119, 123, 165, 1})
+		dGO := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(260, 80),
+		}
+		dMB := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(290, 220),
+		}
+		menuButtonOps := &ebiten.DrawImageOptions{}
+		menuButtonOps.GeoM.Scale(menuButtonScale, menuButtonScale)
+		menuButtonOps.GeoM.Translate(menuButtonX, menuButtonY)
+		screen.DrawImage(menuButton, menuButtonOps)
+		dGO.DrawString("Game over!")
+		dMB.DrawString("Menu")
+
 	}
 	crossOp := &ebiten.DrawImageOptions{}
 
