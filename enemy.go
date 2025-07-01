@@ -3,6 +3,7 @@ package main
 import (
 	"image/color"
 	"math"
+	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -14,6 +15,13 @@ type Enemy struct {
 	TargetX *float64
 	TargetY *float64
 	Radius  float64
+}
+
+var enemyImage *ebiten.Image
+
+func init() {
+	enemyImage = ebiten.NewImage(20, 20)
+	enemyImage.Fill(color.RGBA{255, 0, 0, 255})
 }
 
 func NewEnemy(x, y float64, targetX, targetY *float64) *Enemy {
@@ -29,20 +37,18 @@ func NewEnemy(x, y float64, targetX, targetY *float64) *Enemy {
 }
 
 func (e *Enemy) Update() {
-	// Move towards player (target)
+
 	dx := *e.TargetX - e.X
 	dy := *e.TargetY - e.Y
 	dist := math.Hypot(dx, dy)
 	if dist > 1 {
-		e.X += (dx / dist) * e.Speed
-		e.Y += (dy / dist) * e.Speed
+		offset := rand.Float64()*0.5 - 0.25 // So that the enemies wont be inside of eachother
+		e.X += (dx/dist)*e.Speed + offset
+		e.Y += (dy/dist)*e.Speed + offset
 	}
 }
 
 func (e *Enemy) Draw(screen *ebiten.Image) {
-	const size = 20
-	enemyImage := ebiten.NewImage(size, size)
-	enemyImage.Fill(e.Color)
 
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(e.X, e.Y)

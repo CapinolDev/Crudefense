@@ -25,6 +25,7 @@ type Settings struct {
 	Username   string         `json:"username"`
 	Fullscreen bool           `json:"fullscreen"`
 	UserStats  map[string]int `json:"user_stats"`
+	ShowFps    bool           `json:"show_fps"`
 }
 
 var gameplay *Gameplay
@@ -55,6 +56,11 @@ var (
 	menuButtonX     = 220.0
 	menuButtonY     = 180.0
 	menuButtonScale = 0.5
+	fpsX            = 240.0
+	fpsY            = 240.0
+	fpsScale        = 0.26
+	showFps         bool
+	currentFps      = 0.0
 	inputRunes      []rune
 	currentScene    = "Menu"
 	userName        string
@@ -67,6 +73,7 @@ var (
 	fscreen         *ebiten.Image
 	mainChar        *ebiten.Image
 	menuButton      *ebiten.Image
+	FpsButton       *ebiten.Image
 	audioCtx        *audio.Context
 	player          *audio.Player
 	fontFace        font.Face
@@ -109,6 +116,7 @@ func LoadSettings(filename string) Settings {
 				Username:   "",
 				Fullscreen: true,
 				UserStats:  make(map[string]int),
+				ShowFps:    false,
 			}
 		} else {
 			log.Fatal(err)
@@ -142,6 +150,7 @@ func init() {
 	settings = LoadSettings("settings.json")
 
 	userName = settings.Username
+	showFps = settings.ShowFps
 
 	if settings.Fullscreen {
 		ebiten.SetFullscreen(true)
@@ -183,6 +192,10 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	FpsButton, _, err = ebitenutil.NewImageFromFile("./src/gui/fscreen.png")
+	if err != nil {
+		log.Fatal(err)
+	}
 	f, err := os.Open("./src/audio/clickSound.wav")
 	if err != nil {
 		log.Fatal(err)
@@ -203,6 +216,9 @@ func init() {
 type Game struct{}
 
 func (g *Game) Update() error {
+	if showFps {
+		currentFps = ebiten.ActualFPS()
+	}
 	cursorX, cursorY = ebiten.CursorPosition()
 	inputRunes = inputRunes[:0] // ctrl chars
 	inputRunes = ebiten.AppendInputChars(inputRunes)
@@ -243,13 +259,17 @@ func (g *Game) Update() error {
 				player.Rewind()
 				player.Play()
 				currentScene = "Game"
+				class = "Archer"
+				getClassStats()
 			}
 		}
 		if currentScene == "Settings" {
 			widthG := float64(goBack.Bounds().Dx()) * goBackScale
 			heightG := float64(goBack.Bounds().Dy()) * goBackScale
-			widthF := float64(goBack.Bounds().Dx()) * goBackScale
-			heightF := float64(goBack.Bounds().Dy()) * goBackScale
+			widthF := float64(fscreen.Bounds().Dx()) * goBackScale
+			heightF := float64(fscreen.Bounds().Dy()) * goBackScale
+			widthFp := float64(FpsButton.Bounds().Dx()) * goBackScale
+			heightFp := float64(FpsButton.Bounds().Dy()) * goBackScale
 
 			if float64(cursorX) >= goBackX && float64(cursorX) <= goBackX+widthG &&
 				float64(cursorY) >= goBackY && float64(cursorY) <= goBackY+heightG {
@@ -263,6 +283,13 @@ func (g *Game) Update() error {
 				player.Play()
 				settings.Fullscreen = !settings.Fullscreen
 				ebiten.SetFullscreen(settings.Fullscreen)
+			}
+			if float64(cursorX) >= fpsX && float64(cursorX) <= fpsX+widthFp &&
+				float64(cursorY) >= fpsY && float64(cursorY) <= fpsY+heightFp {
+				player.Rewind()
+				player.Play()
+				settings.ShowFps = !settings.Fullscreen
+				showFps = !showFps
 			}
 		}
 		if currentScene == "GameOver" {
@@ -323,6 +350,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		fScreenOp.GeoM.Scale(fscreenScale, fscreenScale)
 		fScreenOp.GeoM.Translate(fscreenX, fscreenY)
 		fScreenOp.ColorScale.Reset()
+		fpsOp := &ebiten.DrawImageOptions{}
+		fpsOp.GeoM.Scale(fpsScale, fpsScale)
+		fpsOp.GeoM.Translate(fpsX, fpsY)
+		fpsOp.ColorScale.Reset()
 		if settings.Fullscreen {
 
 			fScreenOp.ColorScale.Scale(0, 1, 0, 1)
@@ -330,9 +361,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 			fScreenOp.ColorScale.Scale(1, 0, 0, 1)
 		}
+		if settings.ShowFps {
+
+			fpsOp.ColorScale.Scale(0, 1, 0, 1)
+		} else {
+
+			fpsOp.ColorScale.Scale(1, 0, 0, 1)
+		}
 
 		screen.DrawImage(goBack, goBackOp)
 		screen.DrawImage(fscreen, fScreenOp)
+		screen.DrawImage(FpsButton, fpsOp)
 		//user input
 		dUI := &font.Drawer{
 			Dst:  screen,
@@ -368,11 +407,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			Face: fontFace,
 			Dot:  fixed.P(80, 180),
 		}
+		dFPS := &font.Drawer{
+			Dst:  screen,
+			Src:  image.NewUniform(color.White),
+			Face: fontFace,
+			Dot:  fixed.P(80, 240),
+		}
 		dUI.DrawString(userInput)
 		dIUN.DrawString("Input username:")
 		dUN.DrawString("Current username:")
 		dUNV.DrawString(userName)
 		dFS.DrawString("Fullscreen:")
+		dFPS.DrawString("Show fps:")
 		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 			userName = userInput
 			settings.Username = userInput
