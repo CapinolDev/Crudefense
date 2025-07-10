@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	playerHp             = 10
-	playerSpeed          = 3.0
-	playerRadius         = 20.0
+	playerHp             = 1
+	playerSpeed          = 0.0
+	playerRadius         = 00.0
 	playerInvincible     = false
-	playerInvincibleFor  = 60
+	playerInvincibleFor  = 0
 	playerInvincibleTick = 0
 	currentRound         = 1.0
 	timeSinceLastShot    = 0.0
@@ -31,15 +31,33 @@ var bullets []*Bullet
 type Gameplay struct {
 }
 
+func getClassStats() {
+	if class == "Archer" {
+		playerHp = 10
+		playerSpeed = 3.0
+		playerRadius = 20.0
+		playerInvincible = false
+		playerInvincibleFor = 60
+		playerInvincibleTick = 0
+		timeSinceLastShot = 0.0
+		shootCooldown = 0.0
+		attackType = "Bullet"
+
+	}
+}
+
 func resetValues() {
-	playerHp = 10
-	playerSpeed = 3.0
-	playerRadius = 20.0
+	playerHp = 1
+	playerSpeed = 0.0
+	playerRadius = 00.0
 	playerInvincible = false
-	playerInvincibleFor = 60
+	playerInvincibleFor = 0
 	playerInvincibleTick = 0
 	currentRound = 1.0
 	timeSinceLastShot = 0.0
+	shootCooldown = 0.0
+	attackType = ""
+	class = ""
 	shootCooldown = 0.1
 }
 func isColliding(x1, y1, r1, x2, y2, r2 float64) bool {
@@ -48,6 +66,9 @@ func isColliding(x1, y1, r1, x2, y2, r2 float64) bool {
 	return math.Hypot(dx, dy) < r1+r2
 }
 func NewGameplay() *Gameplay {
+	if currentRound < 1 {
+		currentRound = 1
+	}
 	enemies = []*Enemy{}
 	waveInProgress = true
 
@@ -134,28 +155,29 @@ func (gp *Gameplay) Update() {
 	timeSinceLastShot += 1.0 / ebiten.ActualTPS()
 
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) && timeSinceLastShot >= shootCooldown {
-		mx, my := ebiten.CursorPosition()
-		dx := float64(mx) - playerX
-		dy := float64(my) - playerY
-		dist := math.Hypot(dx, dy)
-		if dist == 0 {
-			dist = 1
+		if attackType == "Bullet" {
+			mx, my := ebiten.CursorPosition()
+			dx := float64(mx) - playerX
+			dy := float64(my) - playerY
+			dist := math.Hypot(dx, dy)
+			if dist == 0 {
+				dist = 1
+			}
+			velX := dx / dist
+			velY := dy / dist
+
+			bullet := NewBullet(playerX, playerY, velX, velY)
+			bullets = append(bullets, bullet)
+
+			timeSinceLastShot = 0
+
 		}
-		velX := dx / dist
-		velY := dy / dist
-
-		bullet := NewBullet(playerX, playerY, velX, velY)
-		bullets = append(bullets, bullet)
-
-		timeSinceLastShot = 0 // reset timer
 	}
 
-	// Update bullets
 	for _, b := range bullets {
 		b.Update()
 	}
 
-	// Update enemies (your existing)
 	for _, enemy := range enemies {
 		enemy.Update()
 
@@ -182,12 +204,22 @@ func (gp *Gameplay) Draw(screen *ebiten.Image) {
 		Face: fontFace,
 		Dot:  fixed.P(10, 20),
 	}
+	dFPS := &font.Drawer{
+		Dst:  screen,
+		Src:  image.NewUniform(color.RGBA{255, 0, 0, 255}),
+		Face: fontFace,
+		Dot:  fixed.P(10, 60),
+	}
 	for _, enemy := range enemies {
 		enemy.Draw(screen)
 	}
 	for _, b := range bullets {
 		b.Draw(screen)
 	}
+	if showFps {
+		dFPS.DrawString(fmt.Sprintf("Fps: %v", currentFps))
+	}
+
 	dHP.DrawString(fmt.Sprintf("HP: %d", playerHp))
 	dCHR.DrawString(userName)
 	charOps := &ebiten.DrawImageOptions{}

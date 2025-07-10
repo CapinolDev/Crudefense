@@ -1,5 +1,6 @@
 {
   "username": "Ahoy",
   "fullscreen": true,
-  "user_stats": {}
+  "user_stats": {},
+  "show_fps": false
 }

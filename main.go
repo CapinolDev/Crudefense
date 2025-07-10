@@ -22,6 +22,7 @@ type Settings struct {
 	Username   string         `json:"username"`
 	Fullscreen bool           `json:"fullscreen"`
 	UserStats  map[string]int `json:"user_stats"`
+	ShowFps    bool           `json:"show_fps"`
 }
 
 var gameplay *Gameplay
@@ -50,6 +51,11 @@ var (
 	menuButtonX     = 220.0
 	menuButtonY     = 180.0
 	menuButtonScale = 0.5
+	fpsX            = 240.0
+	fpsY            = 240.0
+	fpsScale        = 0.26
+	showFps         bool
+	currentFps      = 0.0
 	inputRunes      []rune
 	currentScene    = "Menu"
 	userName        string
@@ -253,6 +259,7 @@ func LoadSettings(filename string) Settings {
 				Username:   "",
 				Fullscreen: true,
 				UserStats:  make(map[string]int),
+				ShowFps:    false,
 			}
 		} else {
 			log.Fatal(err)
@@ -286,6 +293,7 @@ func init() {
 	settings = LoadSettings("settings.json")
 
 	userName = settings.Username
+	showFps = settings.ShowFps
 
 	if settings.Fullscreen {
 		ebiten.SetFullscreen(true)
