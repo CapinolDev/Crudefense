@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"image"
-	"image/color"
 	_ "image/png"
 	"log"
 	"os"
@@ -16,7 +14,6 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
-	"golang.org/x/image/math/fixed"
 )
 
 const sampleRate = 44100
@@ -38,15 +35,13 @@ var (
 	playBtnScale    = 0.7
 	archBtnX        = 0.0
 	archBtnY        = 0.0
-	archBtnScaleX   = 0.6
-	archBtnScaleY   = 0.8
 	settingsX       = 10.0
 	settingsY       = 420.0
 	settingsScale   = 0.1
 	goBackX         = 0.0
 	goBackY         = 0.0
 	goBackScale     = 0.3
-	fscreenX        = 240.0
+	fscreenX        = 120.0
 	fscreenY        = 165.0
 	fscreenScale    = 0.26
 	playerX         = 150.0
@@ -67,11 +62,160 @@ var (
 	fscreen         *ebiten.Image
 	mainChar        *ebiten.Image
 	menuButton      *ebiten.Image
+	background      *ebiten.Image
 	audioCtx        *audio.Context
 	player          *audio.Player
 	fontFace        font.Face
 	settings        Settings
 )
+
+func boolToOnOff(b bool) string {
+	if b {
+		return "On"
+	}
+	return "Off"
+}
+func getLogicalCursorPosition() (int, int) {
+	return ebiten.CursorPosition()
+}
+
+func updateMenu() {
+	widthP := float64(playButton.Bounds().Dx()) * playBtnScale
+	heightP := float64(playButton.Bounds().Dy()) * playBtnScale
+	widthS := float64(settingsButton.Bounds().Dx()) * settingsScale
+	heightS := float64(settingsButton.Bounds().Dy()) * settingsScale
+
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButton0) {
+		if float64(cursorX) >= playBtnX && float64(cursorX) <= playBtnX+widthP &&
+			float64(cursorY) >= playBtnY && float64(cursorY) <= playBtnY+heightP {
+			currentScene = "CharSelect"
+			player.Rewind()
+			player.Play()
+		}
+
+		if float64(cursorX) >= settingsX && float64(cursorX) <= settingsX+widthS &&
+			float64(cursorY) >= settingsY && float64(cursorY) <= settingsY+heightS {
+			currentScene = "Settings"
+			player.Rewind()
+			player.Play()
+		}
+	}
+}
+
+func updateCharSelect() {
+	width := float64(archerButton.Bounds().Dx()) * playBtnScale
+	height := float64(archerButton.Bounds().Dy()) * playBtnScale
+
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButton0) {
+		if float64(cursorX) >= archBtnX && float64(cursorX) <= archBtnX+width &&
+			float64(cursorY) >= archBtnY && float64(cursorY) <= archBtnY+height {
+			resetValues()
+			currentScene = "Game"
+			player.Rewind()
+			player.Play()
+		}
+	}
+}
+
+func updateSettings() {
+	widthG := float64(goBack.Bounds().Dx()) * goBackScale
+	heightG := float64(goBack.Bounds().Dy()) * goBackScale
+	widthF := float64(fscreen.Bounds().Dx()) * fscreenScale
+	heightF := float64(fscreen.Bounds().Dy()) * fscreenScale
+
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButton0) {
+		if float64(cursorX) >= goBackX && float64(cursorX) <= goBackX+widthG &&
+			float64(cursorY) >= goBackY && float64(cursorY) <= goBackY+heightG {
+			player.Rewind()
+			player.Play()
+			currentScene = "Menu"
+		}
+		if float64(cursorX) >= fscreenX && float64(cursorX) <= fscreenX+widthF &&
+			float64(cursorY) >= fscreenY && float64(cursorY) <= fscreenY+heightF {
+			settings.Fullscreen = !settings.Fullscreen
+			ebiten.SetFullscreen(settings.Fullscreen)
+			player.Rewind()
+			player.Play()
+		}
+
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+		userName = userInput
+		settings.Username = userInput
+		userInput = ""
+		if err := SaveSettings("settings.json", settings); err != nil {
+			log.Println("Settings failure:", err)
+		}
+	}
+}
+
+func updateGameOver() {
+	widthM := float64(menuButton.Bounds().Dx()) * menuButtonScale
+	heightM := float64(menuButton.Bounds().Dy()) * menuButtonScale
+
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButton0) {
+		if float64(cursorX) >= menuButtonX && float64(cursorX) <= menuButtonX+widthM &&
+			float64(cursorY) >= menuButtonY && float64(cursorY) <= menuButtonY+heightM {
+			currentScene = "Menu"
+		}
+		player.Rewind()
+		player.Play()
+	}
+}
+func drawMenu(screen *ebiten.Image) {
+	screen.DrawImage(background, nil)
+
+	opPlay := &ebiten.DrawImageOptions{}
+	opPlay.GeoM.Scale(playBtnScale, playBtnScale)
+	opPlay.GeoM.Translate(playBtnX, playBtnY)
+	screen.DrawImage(playButton, opPlay)
+
+	opSettings := &ebiten.DrawImageOptions{}
+	opSettings.GeoM.Scale(settingsScale, settingsScale)
+	opSettings.GeoM.Translate(settingsX, settingsY)
+	screen.DrawImage(settingsButton, opSettings)
+}
+func drawCharSelect(screen *ebiten.Image) {
+	screen.DrawImage(background, nil)
+
+	opArcher := &ebiten.DrawImageOptions{}
+	opArcher.GeoM.Scale(playBtnScale, playBtnScale)
+	opArcher.GeoM.Translate(archBtnX, archBtnY)
+	screen.DrawImage(archerButton, opArcher)
+}
+func drawSettings(screen *ebiten.Image) {
+	screen.DrawImage(background, nil)
+
+	// Draw Go Back button
+	opGoBack := &ebiten.DrawImageOptions{}
+	opGoBack.GeoM.Scale(goBackScale, goBackScale)
+	opGoBack.GeoM.Translate(goBackX, goBackY)
+	screen.DrawImage(goBack, opGoBack)
+
+	// Draw Fullscreen toggle button
+	opFScreen := &ebiten.DrawImageOptions{}
+	opFScreen.GeoM.Scale(fscreenScale, fscreenScale)
+	opFScreen.GeoM.Translate(fscreenX, fscreenY)
+	screen.DrawImage(fscreen, opFScreen)
+
+	// Draw Username input box or current name
+	ebitenutil.DebugPrintAt(screen, "Enter Name: "+userInput, 20, 60)
+	ebitenutil.DebugPrintAt(screen, "Current name: "+settings.Username, 20, 80)
+
+	// Draw Fullscreen label and status
+	fullscreenStatus := boolToOnOff(settings.Fullscreen)
+	ebitenutil.DebugPrintAt(screen, "Fullscreen: "+fullscreenStatus, int(fscreenX)-100, int(fscreenY))
+
+}
+func drawGameOver(screen *ebiten.Image) {
+	screen.DrawImage(background, nil)
+
+	opMenu := &ebiten.DrawImageOptions{}
+	opMenu.GeoM.Scale(menuButtonScale, menuButtonScale)
+	opMenu.GeoM.Translate(menuButtonX, menuButtonY)
+	screen.DrawImage(menuButton, opMenu)
+}
 
 func loadFont() font.Face {
 	ttfBytes, err := os.ReadFile("./src/fonts/Queensides-3z7Ey.ttf")
@@ -137,7 +281,7 @@ func SaveSettings(filename string, settings Settings) error {
 }
 
 func init() {
-
+	initEnemies()
 	var err error
 	settings = LoadSettings("settings.json")
 
@@ -183,6 +327,10 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	background, _, err = ebitenutil.NewImageFromFile("./src/gui/background.png")
+	if err != nil {
+		log.Fatal(err)
+	}
 	f, err := os.Open("./src/audio/clickSound.wav")
 	if err != nil {
 		log.Fatal(err)
@@ -198,13 +346,16 @@ func init() {
 		log.Fatal(err)
 	}
 	gameplay = NewGameplay()
+	upgradeScreen = NewUpgradeScreen()
 }
 
 type Game struct{}
 
 func (g *Game) Update() error {
-	cursorX, cursorY = ebiten.CursorPosition()
-	inputRunes = inputRunes[:0] // ctrl chars
+	mx, my := getLogicalCursorPosition()
+	cursorX = mx
+	cursorY = my
+	inputRunes = inputRunes[:0]
 	inputRunes = ebiten.AppendInputChars(inputRunes)
 
 	for _, r := range inputRunes {
@@ -212,224 +363,69 @@ func (g *Game) Update() error {
 			userInput += string(r)
 		}
 	}
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButton0) {
-		if currentScene == "Menu" {
-			widthP := float64(playButton.Bounds().Dx()) * playBtnScale
-			heightP := float64(playButton.Bounds().Dy()) * playBtnScale
-			widthS := float64(settingsButton.Bounds().Dx()) * settingsScale
-			heightS := float64(settingsButton.Bounds().Dy()) * settingsScale
-
-			if float64(cursorX) >= playBtnX && float64(cursorX) <= playBtnX+widthP &&
-				float64(cursorY) >= playBtnY && float64(cursorY) <= playBtnY+heightP {
-				player.Rewind()
-				player.Play()
-				currentScene = "CharSelect"
-			}
-
-			if float64(cursorX) >= settingsX && float64(cursorX) <= settingsX+widthS &&
-				float64(cursorY) >= settingsY && float64(cursorY) <= settingsY+heightS {
-				player.Rewind()
-				player.Play()
-				currentScene = "Settings"
-			}
-
-		}
-		if currentScene == "CharSelect" {
-			width := float64(archerButton.Bounds().Dx()) * playBtnScale
-			height := float64(archerButton.Bounds().Dy()) * playBtnScale
-
-			if float64(cursorX) >= archBtnX && float64(cursorX) <= archBtnX+width &&
-				float64(cursorY) >= archBtnY && float64(cursorY) <= archBtnY+height {
-				player.Rewind()
-				player.Play()
-				currentScene = "Game"
-			}
-		}
-		if currentScene == "Settings" {
-			widthG := float64(goBack.Bounds().Dx()) * goBackScale
-			heightG := float64(goBack.Bounds().Dy()) * goBackScale
-			widthF := float64(goBack.Bounds().Dx()) * goBackScale
-			heightF := float64(goBack.Bounds().Dy()) * goBackScale
-
-			if float64(cursorX) >= goBackX && float64(cursorX) <= goBackX+widthG &&
-				float64(cursorY) >= goBackY && float64(cursorY) <= goBackY+heightG {
-				player.Rewind()
-				player.Play()
-				currentScene = "Menu"
-			}
-			if float64(cursorX) >= fscreenX && float64(cursorX) <= fscreenX+widthF &&
-				float64(cursorY) >= fscreenY && float64(cursorY) <= fscreenY+heightF {
-				player.Rewind()
-				player.Play()
-				settings.Fullscreen = !settings.Fullscreen
-				ebiten.SetFullscreen(settings.Fullscreen)
-			}
-		}
-		if currentScene == "GameOver" {
-			widthM := float64(menuButton.Bounds().Dx()) * menuButtonScale
-			heightM := float64(menuButton.Bounds().Dy()) * menuButtonScale
-
-			if float64(cursorX) >= menuButtonX && float64(cursorX) <= menuButtonX+widthM &&
-				float64(cursorY) >= menuButtonY && float64(cursorY) <= menuButtonY+heightM {
-				player.Rewind()
-				player.Play()
-				currentScene = "Menu"
-			}
-		}
-
-	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err := SaveSettings("settings.json", settings)
-		if err != nil {
+		if err := SaveSettings("settings.json", settings); err != nil {
 			log.Println("Settings failure:", err)
-
 		}
 		log.Fatal("Game closed by user")
 	}
-	if currentScene == "Game" {
+
+	switch currentScene {
+	case "Menu":
+		updateMenu()
+	case "CharSelect":
+		updateCharSelect()
+	case "Settings":
+		updateSettings()
+	case "Game":
 		gameplay.Update()
+	case "Gameplay":
+		gameplay.Update()
+	case "Upgrade":
+		upgradeScreen.Update()
+	case "GameOver":
+		updateGameOver()
 	}
 
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	if currentScene == "Menu" {
-		screen.Fill(color.RGBA{119, 123, 165, 1})
-		playOp := &ebiten.DrawImageOptions{}
-		playOp.GeoM.Scale(playBtnScale, playBtnScale)
-		playOp.GeoM.Translate(playBtnX, playBtnY)
-		settOp := &ebiten.DrawImageOptions{}
-		settOp.GeoM.Scale(settingsScale, settingsScale)
-		settOp.GeoM.Translate(settingsX, settingsY)
-		screen.DrawImage(playButton, playOp)
-		screen.DrawImage(settingsButton, settOp)
-	}
-	if currentScene == "CharSelect" {
-		screen.Fill(color.RGBA{119, 123, 165, 1})
-		archOp := &ebiten.DrawImageOptions{}
-		archOp.GeoM.Scale(archBtnScaleX, archBtnScaleY)
-		archOp.GeoM.Translate(archBtnX, archBtnY)
-		screen.DrawImage(archerButton, archOp)
-
-	}
-	if currentScene == "Settings" {
-		screen.Fill(color.RGBA{119, 123, 165, 1})
-		goBackOp := &ebiten.DrawImageOptions{}
-		goBackOp.GeoM.Scale(goBackScale, goBackScale)
-		goBackOp.GeoM.Translate(goBackX, goBackY)
-		fScreenOp := &ebiten.DrawImageOptions{}
-		fScreenOp.GeoM.Scale(fscreenScale, fscreenScale)
-		fScreenOp.GeoM.Translate(fscreenX, fscreenY)
-		fScreenOp.ColorScale.Reset()
-		if settings.Fullscreen {
-
-			fScreenOp.ColorScale.Scale(0, 1, 0, 1)
-		} else {
-
-			fScreenOp.ColorScale.Scale(1, 0, 0, 1)
-		}
-
-		screen.DrawImage(goBack, goBackOp)
-		screen.DrawImage(fscreen, fScreenOp)
-		//user input
-		dUI := &font.Drawer{
-			Dst:  screen,
-			Src:  image.NewUniform(color.White),
-			Face: fontFace,
-			Dot:  fixed.P(80, 80),
-		}
-		//"Input username" text
-		dIUN := &font.Drawer{
-			Dst:  screen,
-			Src:  image.NewUniform(color.White),
-			Face: fontFace,
-			Dot:  fixed.P(80, 60),
-		}
-		//"Current username" text
-		dUN := &font.Drawer{
-			Dst:  screen,
-			Src:  image.NewUniform(color.White),
-			Face: fontFace,
-			Dot:  fixed.P(80, 130),
-		}
-		// username
-		dUNV := &font.Drawer{
-			Dst:  screen,
-			Src:  image.NewUniform(color.White),
-			Face: fontFace,
-			Dot:  fixed.P(80, 150),
-		}
-		//fullscreen
-		dFS := &font.Drawer{
-			Dst:  screen,
-			Src:  image.NewUniform(color.White),
-			Face: fontFace,
-			Dot:  fixed.P(80, 180),
-		}
-		dUI.DrawString(userInput)
-		dIUN.DrawString("Input username:")
-		dUN.DrawString("Current username:")
-		dUNV.DrawString(userName)
-		dFS.DrawString("Fullscreen:")
-		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
-			userName = userInput
-			settings.Username = userInput
-			userInput = ""
-			err := SaveSettings("settings.json", settings)
-			if err != nil {
-				log.Println("Settings failure:", err)
-			}
-		}
-
-	}
-	if currentScene == "Game" {
-
+	switch currentScene {
+	case "Menu":
+		drawMenu(screen)
+	case "CharSelect":
+		drawCharSelect(screen)
+	case "Settings":
+		drawSettings(screen)
+	case "Game":
 		gameplay.Draw(screen)
+	case "Upgrade":
+		upgradeScreen.Draw(screen)
+	case "GameOver":
+		drawGameOver(screen)
 	}
-	if currentScene == "GameOver" {
-		resetValues()
-		screen.Fill(color.RGBA{119, 123, 165, 1})
-		dGO := &font.Drawer{
-			Dst:  screen,
-			Src:  image.NewUniform(color.White),
-			Face: fontFace,
-			Dot:  fixed.P(260, 80),
-		}
-		dMB := &font.Drawer{
-			Dst:  screen,
-			Src:  image.NewUniform(color.White),
-			Face: fontFace,
-			Dot:  fixed.P(290, 220),
-		}
-		menuButtonOps := &ebiten.DrawImageOptions{}
-		menuButtonOps.GeoM.Scale(menuButtonScale, menuButtonScale)
-		menuButtonOps.GeoM.Translate(menuButtonX, menuButtonY)
-		screen.DrawImage(menuButton, menuButtonOps)
-		dGO.DrawString("Game over!")
-		dMB.DrawString("Menu")
 
+	if crosshair != nil {
+		op := &ebiten.DrawImageOptions{}
+		scale := 0.02
+
+		op.GeoM.Scale(scale, scale)
+		w, h := crosshair.Bounds().Dx(), crosshair.Bounds().Dy()
+		op.GeoM.Translate(float64(cursorX)-float64(w)*scale/2, float64(cursorY)-float64(h)*scale/2)
+		screen.DrawImage(crosshair, op)
 	}
-	crossOp := &ebiten.DrawImageOptions{}
-
-	crossW := crosshair.Bounds().Dx()
-	crossH := crosshair.Bounds().Dy()
-
-	crossOp.GeoM.Translate(-float64(crossW)/2, -float64(crossH)/2)
-	crossOp.GeoM.Scale(0.03, 0.03)
-	crossOp.GeoM.Translate(float64(cursorX), float64(cursorY))
-	screen.DrawImage(crosshair, crossOp)
-
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return screenWidth, screenHeight
 }
-
 func main() {
 	ebiten.SetCursorMode(ebiten.CursorModeHidden)
 	ebiten.SetWindowTitle("Crudefense")
+	ebiten.SetWindowSize(screenWidth, screenHeight)
+	ebiten.SetWindowResizable(false)
 	if err := ebiten.RunGame(&Game{}); err != nil {
 		log.Fatal(err)
 	}

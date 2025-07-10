@@ -22,6 +22,8 @@ var (
 	currentRound         = 1.0
 	timeSinceLastShot    = 0.0
 	shootCooldown        = 0.7
+	upgradeScreen        *UpgradeScreen
+	waveInProgress       = false
 )
 var enemies []*Enemy
 var bullets []*Bullet
@@ -38,7 +40,7 @@ func resetValues() {
 	playerInvincibleTick = 0
 	currentRound = 1.0
 	timeSinceLastShot = 0.0
-	shootCooldown = 0.7
+	shootCooldown = 0.1
 }
 func isColliding(x1, y1, r1, x2, y2, r2 float64) bool {
 	dx := x1 - x2
@@ -47,16 +49,42 @@ func isColliding(x1, y1, r1, x2, y2, r2 float64) bool {
 }
 func NewGameplay() *Gameplay {
 	enemies = []*Enemy{}
-	for len(enemies) < int(math.Round(currentRound*1.5)) {
-		enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, &playerX, &playerY)
-		enemies = append(enemies, enemy)
+	waveInProgress = true
+
+	switch currentRound {
+	case 1:
+		for i := 0; i < 2; i++ {
+			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 1, &playerX, &playerY)
+			enemies = append(enemies, enemy)
+		}
+	case 2:
+		for i := 0; i < 4; i++ {
+			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 2, &playerX, &playerY)
+			enemies = append(enemies, enemy)
+		}
+	case 3:
+		for i := 0; i < 10; i++ {
+			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 1, &playerX, &playerY)
+			enemies = append(enemies, enemy)
+		}
+	case 4:
+		for i := 0; i < 8; i++ {
+			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 2, &playerX, &playerY)
+			enemies = append(enemies, enemy)
+		}
 	}
+
 	return &Gameplay{}
 }
 
 func (gp *Gameplay) Update() {
 	if playerHp <= 0 {
 		currentScene = "GameOver"
+	}
+	if waveInProgress && len(enemies) == 0 {
+		currentScene = "Upgrade"
+		currentRound++
+		waveInProgress = false // stop triggering Upgrade every frame
 	}
 	if playerInvincible {
 		playerInvincibleTick++
@@ -82,10 +110,14 @@ func (gp *Gameplay) Update() {
 		for j := 0; j < len(enemies); j++ {
 			e := enemies[j]
 			if isColliding(b.X, b.Y, b.Radius, e.X, e.Y, e.Radius) {
-				// Remove bullet and enemy
 				bullets = append(bullets[:i], bullets[i+1:]...)
 				i-- // Adjust index after deletion
-				enemies = append(enemies[:j], enemies[j+1:]...)
+
+				e.HP--
+				if e.HP <= 0 {
+					enemies = append(enemies[:j], enemies[j+1:]...)
+					j-- // Adjust index after deletion if needed
+				}
 				break
 			}
 		}
