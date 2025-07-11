@@ -45,8 +45,8 @@ var (
 	fscreenX        = 120.0
 	fscreenY        = 165.0
 	fscreenScale    = 0.26
-	playerX         = 150.0
-	playerY         = 150.0
+	playerX         = 320.0
+	playerY         = 240.0
 	playerScale     = 0.4
 	menuButtonX     = 220.0
 	menuButtonY     = 180.0

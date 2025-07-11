@@ -14,6 +14,7 @@ import (
 
 var (
 	playerHp             = 10
+	MaxHp                = 10
 	playerSpeed          = 3.0
 	playerRadius         = 20.0
 	playerInvincible     = false
@@ -24,6 +25,8 @@ var (
 	shootCooldown        = 0.7
 	upgradeScreen        *UpgradeScreen
 	waveInProgress       = false
+	bulletAmount         = 1
+	vampireLvl           = 0
 )
 var enemies []*Enemy
 var bullets []*Bullet
@@ -33,12 +36,17 @@ type Gameplay struct {
 
 func resetValues() {
 	playerHp = 10
-	playerX = 150.0
-	playerY = 150.0
+	MaxHp = 10
+	playerX = 320.0
+	playerY = 240.0
 	playerSpeed = 3.0
 	playerRadius = 20.0
 	playerInvincible = false
 	playerInvincibleTick = 0
+	bulletAmount = 1
+	bulletSpeed = 3.0
+	vampireLvl = 0
+	bouncesAmount = 0 // Reset bounces amount
 
 	timeSinceLastShot = 0.0
 	shootCooldown = 0.7
@@ -48,6 +56,36 @@ func resetValues() {
 	//reset round and wave state
 	currentRound = 1.0
 	waveInProgress = false
+}
+func vampHeal() {
+	if vampireLvl > 0 {
+		playerHp += vampireLvl
+		if playerHp > MaxHp {
+			playerHp = MaxHp // cap hp at MaxHp
+		}
+	}
+}
+func randomOffscreenPosition() (x, y float64) {
+	screenW := float64(screenWidth)
+	screenH := float64(screenHeight)
+
+	edge := rand.Intn(4) // 0 = top, 1 = bottom, 2 = left, 3 = right
+
+	switch edge {
+	case 0: // top
+		x = rand.Float64() * screenW
+		y = -30
+	case 1: // bottom
+		x = rand.Float64() * screenW
+		y = screenH + 30
+	case 2: // left
+		x = -30
+		y = rand.Float64() * screenH
+	case 3: // right
+		x = screenW + 30
+		y = rand.Float64() * screenH
+	}
+	return
 }
 func isColliding(x1, y1, r1, x2, y2, r2 float64) bool {
 	dx := x1 - x2
@@ -61,27 +99,30 @@ func NewGameplay() *Gameplay {
 	enemies = []*Enemy{}
 	waveInProgress = true
 
+	spawnEnemies := func(count, level int) {
+		for i := 0; i < count; i++ {
+			ex, ey := randomOffscreenPosition()
+			enemy := NewEnemy(ex, ey, level, &playerX, &playerY)
+			enemies = append(enemies, enemy)
+		}
+	}
+
 	switch currentRound {
 	case 1:
-		for i := 0; i < 2; i++ {
-			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 1, &playerX, &playerY)
-			enemies = append(enemies, enemy)
-		}
+		spawnEnemies(2, 1)
 	case 2:
-		for i := 0; i < 4; i++ {
-			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 2, &playerX, &playerY)
-			enemies = append(enemies, enemy)
-		}
+		spawnEnemies(4, 2)
 	case 3:
-		for i := 0; i < 10; i++ {
-			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 1, &playerX, &playerY)
-			enemies = append(enemies, enemy)
-		}
+		spawnEnemies(10, 1)
 	case 4:
-		for i := 0; i < 8; i++ {
-			enemy := NewEnemy((rand.Float64()+0.2)*700, (rand.Float64()+0.2)*700, 2, &playerX, &playerY)
-			enemies = append(enemies, enemy)
-		}
+		spawnEnemies(8, 2)
+	case 5:
+		spawnEnemies(2, 4)
+	case 6:
+		spawnEnemies(6, 3)
+	default:
+		// if i didnt specify a round, spawn enemies based on the current round
+		spawnEnemies(int(currentRound*2), int(currentRound/2))
 	}
 
 	return &Gameplay{}
@@ -155,9 +196,10 @@ func (gp *Gameplay) Update() {
 
 				e.HP--
 				if e.HP <= 0 {
-					enemies = append(enemies[:j], enemies[j+1:]...)
-					j-- // Adjust index after deletion if needed
+					enemies = append(enemies[:j], enemies[j+1:]...) // Remove enemy
+					j--                                             // Adjust index after deletion if needed
 				}
+				vampHeal() // Heal if vampire mutation is active
 				break
 			}
 		}
@@ -184,16 +226,27 @@ func (gp *Gameplay) Update() {
 		}
 		velX := dx / dist
 		velY := dy / dist
+		for i := 0; i < bulletAmount; i++ {
+			// Spread bullets slightly
+			spread := float64(i)*0.1 - float64(bulletAmount-1)*0.05
+			bullet := NewBullet(playerX, playerY, velX+spread, velY+spread)
+			bullets = append(bullets, bullet)
 
-		bullet := NewBullet(playerX, playerY, velX, velY)
-		bullets = append(bullets, bullet)
+		}
 
 		timeSinceLastShot = 0
 
 	}
-
+	filtered := bullets[:0]
 	for _, b := range bullets {
-		b.Update()
+		b.Update(screenWidth, screenHeight)
+		if b.BouncesLeft >= 0 {
+			filtered = append(filtered, b)
+		}
+	}
+	bullets = filtered
+	for _, b := range bullets {
+		b.Update(640, 480)
 	}
 
 	for _, enemy := range enemies {
