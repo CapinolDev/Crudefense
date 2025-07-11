@@ -51,28 +51,26 @@ var (
 	menuButtonX     = 220.0
 	menuButtonY     = 180.0
 	menuButtonScale = 0.5
-	fpsX            = 240.0
-	fpsY            = 240.0
-	fpsScale        = 0.26
-	showFps         bool
-	currentFps      = 0.0
-	inputRunes      []rune
-	currentScene    = "Menu"
-	userName        string
-	userInput       string
-	crosshair       *ebiten.Image
-	playButton      *ebiten.Image
-	archerButton    *ebiten.Image
-	settingsButton  *ebiten.Image
-	goBack          *ebiten.Image
-	fscreen         *ebiten.Image
-	mainChar        *ebiten.Image
-	menuButton      *ebiten.Image
-	background      *ebiten.Image
-	audioCtx        *audio.Context
-	player          *audio.Player
-	fontFace        font.Face
-	settings        Settings
+
+	showFps        bool
+	currentFps     = 0.0
+	inputRunes     []rune
+	currentScene   = "Menu"
+	userName       string
+	userInput      string
+	crosshair      *ebiten.Image
+	playButton     *ebiten.Image
+	archerButton   *ebiten.Image
+	settingsButton *ebiten.Image
+	goBack         *ebiten.Image
+	fscreen        *ebiten.Image
+	mainChar       *ebiten.Image
+	menuButton     *ebiten.Image
+	background     *ebiten.Image
+	audioCtx       *audio.Context
+	player         *audio.Player
+	fontFace       font.Face
+	settings       Settings
 )
 
 func boolToOnOff(b bool) string {
@@ -115,8 +113,10 @@ func updateCharSelect() {
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButton0) {
 		if float64(cursorX) >= archBtnX && float64(cursorX) <= archBtnX+width &&
 			float64(cursorY) >= archBtnY && float64(cursorY) <= archBtnY+height {
+
 			resetValues()
 			currentScene = "Game"
+			NewGameplay()
 			player.Rewind()
 			player.Play()
 		}
@@ -164,6 +164,8 @@ func updateGameOver() {
 		if float64(cursorX) >= menuButtonX && float64(cursorX) <= menuButtonX+widthM &&
 			float64(cursorY) >= menuButtonY && float64(cursorY) <= menuButtonY+heightM {
 			currentScene = "Menu"
+			resetValues()
+
 		}
 		player.Rewind()
 		player.Play()
@@ -371,11 +373,16 @@ func (g *Game) Update() error {
 			userInput += string(r)
 		}
 	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyBackspace) && len(userInput) > 0 {
+		userInput = userInput[:len(userInput)-1]
+	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		if err := SaveSettings("settings.json", settings); err != nil {
 			log.Println("Settings failure:", err)
 		}
+		player.Close()
+
 		log.Fatal("Game closed by user")
 	}
 
@@ -387,8 +394,6 @@ func (g *Game) Update() error {
 	case "Settings":
 		updateSettings()
 	case "Game":
-		gameplay.Update()
-	case "Gameplay":
 		gameplay.Update()
 	case "Upgrade":
 		upgradeScreen.Update()
