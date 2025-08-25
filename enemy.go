@@ -73,6 +73,10 @@ func (e *Enemy) Draw(screen *ebiten.Image) {
 		clr = color.RGBA{255, 0, 0, 255} // red
 		e.Radius = 5                     // small radius for red enemies
 		e.Speed = 4.0                    // faster speed for red enemies
+	case 40:
+		clr = color.RGBA{100, 255, 40, 255} // special green for boss
+		e.Radius = 24                       // increase radius for boss
+		e.Speed = 2.0                       // faster speed for boss
 	default:
 		clr = color.RGBA{255, 255, 255, 255} // white for unknown
 	}

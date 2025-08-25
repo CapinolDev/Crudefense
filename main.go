@@ -1,10 +1,11 @@
 package main
 
 import (
+	"bytes"
+	_ "embed"
 	"encoding/json"
 	_ "image/png"
 	"log"
-	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -15,6 +16,9 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 )
+
+//go:embed settings.json
+var settingsData []byte
 
 const sampleRate = 44100
 
@@ -226,12 +230,7 @@ func drawGameOver(screen *ebiten.Image) {
 }
 
 func loadFont() font.Face {
-	ttfBytes, err := os.ReadFile("./src/fonts/Queensides-3z7Ey.ttf")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ttfFont, err := opentype.Parse(ttfBytes)
+	ttfFont, err := opentype.Parse(fontBytes)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -250,49 +249,26 @@ func loadFont() font.Face {
 	return fontFace
 }
 
-func LoadSettings(filename string) Settings {
-	var settings Settings
-
-	file, err := os.Open(filename)
+func LoadSettings() Settings {
+	var s Settings
+	err := json.Unmarshal(settingsData, &s)
 	if err != nil {
-		if os.IsNotExist(err) {
-			// File doesn't exist, return default settings
-			return Settings{
-				Username:   "",
-				Fullscreen: true,
-				UserStats:  make(map[string]int),
-				ShowFps:    false,
-			}
-		} else {
-			log.Fatal(err)
+		log.Println("Failed to load embedded settings:", err)
+		// fallback defaults
+		return Settings{
+			Username:   "",
+			Fullscreen: true,
+			UserStats:  make(map[string]int),
+			ShowFps:    false,
 		}
 	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&settings)
-	if err != nil {
-		log.Fatal("Failed to decode settings:", err)
-	}
-
-	return settings
-}
-func SaveSettings(filename string, settings Settings) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ") // Pretty print JSON
-	return encoder.Encode(settings)
+	return s
 }
 
 func init() {
 	initEnemies()
 	var err error
-	settings = LoadSettings("settings.json")
+	settings = LoadSettings()
 
 	userName = settings.Username
 	showFps = settings.ShowFps
@@ -304,49 +280,21 @@ func init() {
 	}
 	fontFace = loadFont()
 	audioCtx = audio.NewContext(sampleRate)
-	crosshair, _, err = ebitenutil.NewImageFromFile("./src/gui/crosshair.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	playButton, _, err = ebitenutil.NewImageFromFile("./src/gui/playButton.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	archerButton, _, err = ebitenutil.NewImageFromFile("./src/gui/archerButton.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	settingsButton, _, err = ebitenutil.NewImageFromFile("./src/gui/cogwheel.png")
+	crosshair, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(crosshairPNG))
+	playButton, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(playButtonPNG))
+	archerButton, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(archerButtonPNG))
+	settingsButton, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(settingsButtonPNG))
+	goBack, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(goBackPNG))
+	fscreen, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(fscreenPNG))
+	mainChar, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(mainCharPNG))
+	menuButton, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(menuButtonPNG))
+	background, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(backgroundPNG))
+
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	goBack, _, err = ebitenutil.NewImageFromFile("./src/gui/goBack.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fscreen, _, err = ebitenutil.NewImageFromFile("./src/gui/fscreen.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	mainChar, _, err = ebitenutil.NewImageFromFile("./src/entities/mainChar.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	menuButton, _, err = ebitenutil.NewImageFromFile("./src/gui/menuButton.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	background, _, err = ebitenutil.NewImageFromFile("./src/gui/background.png")
-	if err != nil {
-		log.Fatal(err)
-	}
-	f, err := os.Open("./src/audio/clickSound.wav")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	d, err := wav.Decode(audioCtx, f)
+	d, err := wav.Decode(audioCtx, bytes.NewReader(clickWav))
 	if err != nil {
 		log.Fatal(err)
 	}

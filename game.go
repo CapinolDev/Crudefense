@@ -120,6 +120,8 @@ func NewGameplay() *Gameplay {
 		spawnEnemies(2, 4)
 	case 6:
 		spawnEnemies(6, 3)
+	case 7:
+		spawnEnemies(1, 40) // Boss
 	default:
 		// if i didnt specify a round, spawn enemies based on the current round
 		spawnEnemies(int(currentRound*2), int(currentRound/2))
