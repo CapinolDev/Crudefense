@@ -111,6 +111,11 @@ func updateMenu() {
 }
 
 func updateCharSelect() {
+	if settings.Fullscreen {
+		ebiten.SetFullscreen(true)
+	} else {
+		ebiten.SetFullscreen(false)
+	}
 	width := float64(archerButton.Bounds().Dx()) * playBtnScale
 	height := float64(archerButton.Bounds().Dy()) * playBtnScale
 
@@ -121,13 +126,19 @@ func updateCharSelect() {
 			resetValues()
 			currentScene = "Game"
 			NewGameplay()
-			player.Rewind()
-			player.Play()
+
 		}
 	}
 }
 
 func updateSettings() {
+	player.Rewind()
+	player.Play()
+	if settings.Fullscreen {
+		ebiten.SetFullscreen(true)
+	} else {
+		ebiten.SetFullscreen(false)
+	}
 	widthG := float64(goBack.Bounds().Dx()) * goBackScale
 	heightG := float64(goBack.Bounds().Dy()) * goBackScale
 	widthF := float64(fscreen.Bounds().Dx()) * fscreenScale
@@ -273,11 +284,6 @@ func init() {
 	userName = settings.Username
 	showFps = settings.ShowFps
 
-	if settings.Fullscreen {
-		ebiten.SetFullscreen(true)
-	} else {
-		ebiten.SetFullscreen(false)
-	}
 	fontFace = loadFont()
 	audioCtx = audio.NewContext(sampleRate)
 	crosshair, _, err = ebitenutil.NewImageFromReader(bytes.NewReader(crosshairPNG))
@@ -378,7 +384,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(crosshair, op)
 	}
 }
-
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return screenWidth, screenHeight
 }

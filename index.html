@@ -6,8 +6,26 @@
 <script src="wasm_exec.js"></script>
 <script>
 const go = new Go();
-WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
-  go.run(result.instance);
+
+async function start() {
+    const result = await WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject);
+    go.run(result.instance);
+}
+
+// Start only after a user click (works in iframe)
+document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.createElement("button");
+    btn.innerText = "Start Game";
+    btn.style.position = "absolute";
+    btn.style.left = "50%";
+    btn.style.top = "50%";
+    btn.style.transform = "translate(-50%, -50%)";
+    btn.style.fontSize = "24px";
+    document.body.appendChild(btn);
+    btn.addEventListener("click", () => {
+        btn.remove();
+        start();
+    });
 });
 </script>
 <style>
@@ -16,6 +34,5 @@ canvas { display: block; width: 100vw; height: 100vh; }
 </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
 </body>
 </html>
